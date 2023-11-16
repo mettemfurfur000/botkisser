@@ -1,0 +1,6 @@
+.vscode
+botkisser/kisser_data
+botkisser/*.txt
+botkisser/gateway.json
+botkisser/*.log
+.litconfig
