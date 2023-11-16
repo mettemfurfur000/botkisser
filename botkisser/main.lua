@@ -80,6 +80,35 @@ local function exit_stop()
 	process:exit(0)
 end
 
+local function is_admin(message)
+	if message.member.hasPermission then
+		if not message.member:hasPermission("administrator") then
+			-- The user does not have enough permissions
+			message:reply("You do not have `administrator` permissions, sorry!")
+			return false
+		end
+	else
+		print('sussy, no permissions at all......')
+		return false
+	end
+	return true
+end
+
+local function update_setting(server_id, field_name, data)
+	local settings
+	if server_settings[server_id] ~= nil then
+		settings = server_settings[server_id]
+	else
+		settings = {}
+	end
+
+	settings[field_name] = data
+
+	server_settings[server_id] = settings
+
+	save_data("kisser_data", "server_settings", server_settings)
+end
+
 client:on('messageCreate', function(message)
 	-- do not react at my own messages
 	if message.author.id == bot_itself_id then return end
@@ -88,39 +117,11 @@ client:on('messageCreate', function(message)
 		' content: ' .. message.content ..
 		' channel type: ' .. message.channel.type)
 
-	if message.author.hasPermission then
-		if not message.author:hasPermission("administrator") then
-			-- The user does not have enough permissions
-			message:reply("You do not have `administrator` permissions!")
-			return
-		end
-	end
-
 	local words = {}
 	for word in message.content:gmatch("%S+") do table.insert(words, word) end
 
 	local server_id = message.guild.id
-	local channel_id = message.channel.id
-	local role_id
-	if message.mentionedRoles.first then
-		role_id = message.mentionedRoles.first.id
-	end
 
-	local settings
-	if server_settings[server_id] ~= nil then
-		settings = server_settings[server_id]
-	else
-		settings = {}
-	end
-
-	if server_id == nil then
-		print('no server_id')
-		return
-	end
-	if channel_id == nil then
-		print('no channel_id')
-		return
-	end
 	if server_id == nil then
 		print('no server_id')
 		return
@@ -130,37 +131,42 @@ client:on('messageCreate', function(message)
 		message.channel:send('There is my comamnd if yu want to know!! \n'
 			.. prefix .. 'set_channel - set channel where i will kiss peopl\n'
 			.. prefix .. 'set_role - set role who wil be kissed\n'
-			.. prefix .. 'set_period - set period in minutes\n')
+			.. prefix .. 'set_period - set period in minutes\n'
+			.. prefix .. 'get_settings - dump setings to chat or what or where\n')
 	end
 
-	if words[1] == prefix .. 'set_channel' then
-		settings["kiss_channel_id"] = channel_id
+	if words[1] == prefix .. 'set_channel' and is_admin(message) then
+		update_setting(server_id, "kiss_channel_id", message.channel.id)
 		message.channel:send('Channel set as the kissing destination')
 	end
 
-	if words[1] == prefix .. 'set_role' then
-		settings["role_kiss_id"] = role_id
-		message.channel:send('Set ' .. message.mentionedRoles.first.name .. '(' .. role_id .. ') as role to kiss')
+	if words[1] == prefix .. 'set_role' and is_admin(message) then
+		local mentioned_role_id
+		if message.mentionedRoles.first ~= nil then
+			mentioned_role_id = message.mentionedRoles.first.id
+		end
+
+		update_setting(server_id, "role_kiss_id", mentioned_role_id)
+		message.channel:send('Set ' ..
+			message.mentionedRoles.first.name .. '( id:' .. mentioned_role_id .. ') as role to kiss')
 	end
 
-	if words[1] == prefix .. 'set_period' then
+	if words[1] == prefix .. 'set_period' and is_admin(message) then
 		local num = tonumber(words[2]);
 		if num ~= nil then
+			update_setting(server_id, "kiss_every", num)
 			message.channel:send('Now i will kiss every ' .. num .. ' min')
 		else
-			num = 360
-			message.channel:send('Looks like not valid number, falling to default value of 6 hrs (360 mins)..')
+			message.channel:send('Looks like not valid number....')
 		end
-		settings["kiss_every"] = num
 	end
 
-	server_settings[server_id] = settings
-
-	save_data("kisser_data", "server_settings", server_settings)
+	if words[1] == prefix .. 'get_settings' and is_admin(message) then
+		message.channel:send(dump(server_settings[server_id]))
+	end
 end)
 
 clock:on("min", function()
-	exit_stop()
 	for guild in client.guilds:iter() do
 		local server_id = guild.id
 
@@ -181,12 +187,6 @@ clock:on("min", function()
 			goto continue
 		end
 
-		-- for now ignore other servers
-		-- if server_id ~= "796805731890364447" then
-		-- 	print("ignoring this one")
-		-- 	goto continue
-		-- end
-
 		print('kissing in ' .. server_id)
 		-- Find the corresponding channel for the current guild
 		local kiss_channel_id = server_settings[server_id].kiss_channel_id
@@ -204,8 +204,6 @@ clock:on("min", function()
 
 		-- choose member
 		local random_person = guild.members:random()
-		-- roll again to find not bot and members with required role
-		-- every condition must be false to stop randompicking
 		while random_person.user.id == bot_itself_id -- dont kiss yourself
 			or random_person.user.bot == true  --dont kiss bots
 			or random_person.roles:find(function(o) -- dont kiss people who doesnt have kiss role
@@ -217,11 +215,6 @@ clock:on("min", function()
 
 		local channel = guild:getChannel(kiss_channel_id)
 		channel:send(random_person.mentionString .. ', you have been kissed!')
-		-- if random_person.nickname ~= nil then
-		-- 	channel:send(random_person.nickname .. ', you have been kissed!')
-		-- else
-		-- 	channel:send(random_person.user.name .. ', you have been kissed!')
-		-- end
 
 		save_data("kisser_data", "server_settings", server_settings)
 		::continue::
@@ -231,12 +224,15 @@ end)
 client:on('ready', function()
 	-- client.user is the path for your bot
 	print('Logged in as ' .. client.user.username)
-	
+
 	local ret = load_data("kisser_data", "server_settings")
 	if type(ret) == "table" then
 		server_settings = ret
 		print('Successful server settings load:')
 		print(dump(server_settings))
+	else
+		print('No server settings found, sad')
+		exit_stop()
 	end
 end)
 
@@ -246,6 +242,12 @@ clock:start()
 
 local tokenfile = io.open("token.txt", "rb")
 
-if tokenfile == nil then print("no token file") return end
+if tokenfile == nil then
+	print("no token file")
+	return
+end
 
-client:run('Bot '..tokenfile:read())
+-- to prevent infinite git pulls or something
+set_system_command("error")
+
+client:run('Bot ' .. tokenfile:read())
