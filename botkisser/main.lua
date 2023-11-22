@@ -10,6 +10,7 @@ local json = require("json")
 local clock = discordia.Clock()
 
 local bot_itself_id = '1169145779949154344'
+local tem_id = '438590839384571905'
 local prefix = '&'
 
 -- Table to store server settings
@@ -48,19 +49,6 @@ local function load_data(path, filename_no_extension)
 	io.close(f)
 
 	return data
-end
-
-local function dump(o)
-	if type(o) == 'table' then
-		local s = '{ '
-		for k, v in pairs(o) do
-			if type(k) ~= 'number' then k = '"' .. k .. '"' end
-			s = s .. '[' .. k .. '] = ' .. dump(v) .. ','
-		end
-		return s .. '} '
-	else
-		return tostring(o)
-	end
 end
 
 local function set_system_command(command)
@@ -109,6 +97,87 @@ local function update_setting(server_id, field_name, data)
 	save_data("kisser_data", "server_settings", server_settings)
 end
 
+local function handle_tem(message, words)
+	if words[1] == 'help' then
+		message.channel:send('ar u mad? look there is my comadns:\n'
+			.. 'help - this message\n'
+			.. 'update - update from github\n'
+			.. 'stop - stop bot forever\n')
+	end
+
+	if words[1] == 'update' then
+		exit_update()
+	end
+
+	if words[1] == 'stop' then
+		exit_stop()
+	end
+end
+
+local function handle_command(message, words)
+	local server_id = message.guild.id
+
+	if server_id == nil then
+		print('no server_id')
+		return
+	end
+
+	if words[1] == prefix .. 'help' then
+		message.channel:send('There is my comamnd if yu want to know!! \n'
+			.. prefix .. 'set_channel - set channel where i will kiss peopl\n'
+			.. prefix .. 'set_role (role ping / role id) - set role who will be kissed\n'
+			.. prefix .. 'set_period (number) - set period in minutes\n'
+			.. prefix .. 'get_settings - dump setings to chat in json format\n'
+			.. prefix .. 'set_settings {json string} - apply settings from json string\n'
+			.. prefix .. 'help - show this mesage')
+		return
+	end
+
+	if words[1] == prefix .. 'set_channel' and is_admin(message) then
+		update_setting(server_id, "kiss_channel_id", message.channel.id)
+		message.channel:send('Channel set as the kissing destination')
+		return
+	end
+
+	if words[1] == prefix .. 'set_role' and is_admin(message) then
+		local mentioned_role_id
+		if message.mentionedRoles.first ~= nil or words[2] ~= nil then
+			mentioned_role_id = message.mentionedRoles.first.id
+		else
+			message.channel:send('Also specify role, please (ping them or give me role id)')
+		end
+
+		update_setting(server_id, "role_kiss_id", mentioned_role_id)
+		message.channel:send('Set ' ..
+			message.mentionedRoles.first.name .. '( id:' .. mentioned_role_id .. ') as role to kiss')
+		return
+	end
+
+	if words[1] == prefix .. 'set_period' and is_admin(message) then
+		local num = tonumber(words[2]);
+		if num ~= nil then
+			update_setting(server_id, "kiss_every", num)
+			message.channel:send('Now i will kiss every ' .. num .. ' min')
+		else
+			message.channel:send('Looks like not valid number....')
+		end
+		return
+	end
+
+	if words[1] == prefix .. 'get_settings' and is_admin(message) then
+		message.channel:send(json.encode(server_settings[server_id]))
+		return
+	end
+
+	if words[1] == prefix .. 'set_settings' and is_admin(message) then
+		local content = message.content:gsub("^.-%s", "",1) 
+		server_settings[server_id] = json.decode(content)
+
+		save_data("kisser_data", "server_settings", server_settings)
+		message.channel:send('Done!.. i think..')
+	end
+end
+
 client:on('messageCreate', function(message)
 	-- do not react at my own messages
 	if message.author.id == bot_itself_id then return end
@@ -120,50 +189,12 @@ client:on('messageCreate', function(message)
 	local words = {}
 	for word in message.content:gmatch("%S+") do table.insert(words, word) end
 
-	local server_id = message.guild.id
-
-	if server_id == nil then
-		print('no server_id')
+	if message.author.id == tem_id and message.channel.type == discordia.enums.channelType.private then
+		handle_tem(message, words)
 		return
 	end
 
-	if words[1] == prefix .. 'help' then
-		message.channel:send('There is my comamnd if yu want to know!! \n'
-			.. prefix .. 'set_channel - set channel where i will kiss peopl\n'
-			.. prefix .. 'set_role - set role who wil be kissed\n'
-			.. prefix .. 'set_period - set period in minutes\n'
-			.. prefix .. 'get_settings - dump setings to chat or what or where\n')
-	end
-
-	if words[1] == prefix .. 'set_channel' and is_admin(message) then
-		update_setting(server_id, "kiss_channel_id", message.channel.id)
-		message.channel:send('Channel set as the kissing destination')
-	end
-
-	if words[1] == prefix .. 'set_role' and is_admin(message) then
-		local mentioned_role_id
-		if message.mentionedRoles.first ~= nil then
-			mentioned_role_id = message.mentionedRoles.first.id
-		end
-
-		update_setting(server_id, "role_kiss_id", mentioned_role_id)
-		message.channel:send('Set ' ..
-			message.mentionedRoles.first.name .. '( id:' .. mentioned_role_id .. ') as role to kiss')
-	end
-
-	if words[1] == prefix .. 'set_period' and is_admin(message) then
-		local num = tonumber(words[2]);
-		if num ~= nil then
-			update_setting(server_id, "kiss_every", num)
-			message.channel:send('Now i will kiss every ' .. num .. ' min')
-		else
-			message.channel:send('Looks like not valid number....')
-		end
-	end
-
-	if words[1] == prefix .. 'get_settings' and is_admin(message) then
-		message.channel:send(dump(server_settings[server_id]))
-	end
+	handle_command(message, words)
 end)
 
 clock:on("min", function()
@@ -224,12 +255,13 @@ end)
 client:on('ready', function()
 	-- client.user is the path for your bot
 	print('Logged in as ' .. client.user.username)
+	print('bot owner id: ' .. client.owner.id)
 
 	local ret = load_data("kisser_data", "server_settings")
 	if type(ret) == "table" then
 		server_settings = ret
 		print('Successful server settings load:')
-		print(dump(server_settings))
+		print(json.encode(server_settings))
 	else
 		print('No server settings found, sad')
 		exit_stop()
