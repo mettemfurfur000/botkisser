@@ -211,13 +211,12 @@ clock:on("min", function()
 
 		personal_counter = server_settings[server_id].counter or 0
 		kiss_every = server_settings[server_id].kiss_every or 0
+		
+		server_settings[server_id].counter = personal_counter + 1
 
 		if personal_counter % kiss_every ~= 0 then
-			server_settings[server_id].counter = personal_counter + 1
 			goto continue
 		end
-
-		personal_counter = 0
 
 		print('kissing in ' .. server_id)
 		-- Find the corresponding channel for the current guild
