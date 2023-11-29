@@ -404,7 +404,7 @@ table.insert(commands_table, {
 		if count_amount_of_custom_roles(server_id, message.author.id) > limit then
 			send_message_or_react(message, server_id,
 				'oonono, too many roles for you, my friend!..', emoji_strs.no)
-			message.channel:send('/gif anime bonk')
+			message.channel:send('https://tenor.com/view/powerful-head-slap-anime-death-tragic-gif-14358509')
 			return
 		end
 
