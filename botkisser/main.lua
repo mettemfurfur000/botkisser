@@ -1,6 +1,7 @@
 local discordia = require('discordia')
 local process = require('process').globalProcess()
 local timer = require('timer')
+local table = require('table')
 
 local client = discordia.Client {
 	cacheAllMembers = true,
@@ -131,7 +132,6 @@ local function update_setting(server_id, field_name, data)
 	save_data("kisser_data", "server_settings", server_settings)
 end
 
-
 -- template
 -- admin only
 -- { is_admin = 1 , name = "name", function = fname }
@@ -185,7 +185,7 @@ table.insert(commands_table, {
 	end
 })
 
-commands_table:insert({
+table.insert(commands_table, {
 	tem_only = true,
 	name = "update",
 	desc = "updates the bot from hitgub repos and then restarts.. for tem usage only!",
@@ -194,7 +194,7 @@ commands_table:insert({
 	end
 })
 
-commands_table:insert({
+table.insert(commands_table, {
 	tem_only = true,
 	name = "stop",
 	desc = "stops the bot.. no restart though..",
@@ -203,7 +203,7 @@ commands_table:insert({
 	end
 })
 
-commands_table:insert({
+table.insert(commands_table, {
 	admin_only = true,
 	name = "set_channel",
 	desc = "set the channel where i will kiss peopl",
@@ -213,7 +213,7 @@ commands_table:insert({
 	end
 })
 
-commands_table:insert({
+table.insert(commands_table, {
 	admin_only = true,
 	name = "set_period",
 	args_desc = '(number)',
@@ -236,7 +236,7 @@ commands_table:insert({
 	end
 })
 
-commands_table:insert({
+table.insert(commands_table, {
 	admin_only = true,
 	name = 'set_role',
 	args_desc = '(pinged role / role id)',
@@ -256,7 +256,7 @@ commands_table:insert({
 	end
 })
 
-commands_table:insert({
+table.insert(commands_table, {
 	admin_only = true,
 	name = 'get_settings',
 	desc = 'dump setings to chat in json format',
@@ -265,7 +265,7 @@ commands_table:insert({
 	end
 })
 
-commands_table:insert({
+table.insert(commands_table, {
 	admin_only = true,
 	name = 'set_settings',
 	args_desc = '(json string)',
@@ -279,7 +279,7 @@ commands_table:insert({
 	end
 })
 
-commands_table:insert({
+table.insert(commands_table, {
 	admin_only = true,
 	name = 'toggle',
 	args_desc = '[feature name]',
