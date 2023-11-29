@@ -462,10 +462,6 @@ clock:on("min", function()
 	for guild in client.guilds:iter() do
 		local server_id = guild.id
 
-		if server_id == 1143597013779361915 then
-			goto continue
-		end
-
 		check_for_expired_roles(server_id)
 
 		local personal_counter
