@@ -401,9 +401,10 @@ table.insert(commands_table, {
 			return
 		end
 		
-		if count_amount_of_custom_roles(server_id, message.author.id) > limit then
+		local roles_count = count_amount_of_custom_roles(server_id, message.author.id)
+		if roles_count > limit then
 			send_message_or_react(message, server_id,
-				'oonono, too many roles for you, my friend!..', emoji_strs.no)
+				'oonono, too many roles for you, my friend!.. limit is ' .. roles_count .. ' btw', emoji_strs.no)
 			message.channel:send('https://tenor.com/view/powerful-head-slap-anime-death-tragic-gif-14358509')
 			return
 		end
@@ -427,7 +428,7 @@ table.insert(commands_table, {
 			discordia.Color.fromHex(words[3]),
 			exp_time)
 		send_message_or_react(message, server_id, 'Enjoy your new shiny role! it will expire after ' ..
-			exp_time .. ' min', emoji_strs.ok)
+			exp_time .. ' min and you have ' .. limit - roles_count .. ' more role slots', emoji_strs.ok)
 	end
 })
 
