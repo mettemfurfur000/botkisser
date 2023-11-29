@@ -175,8 +175,8 @@ table.insert(commands_table, {
 			help_message = help_message
 				.. '\t'
 				.. commands_table.name .. " "
-				.. commands_table.args_desc or "" .. " - "
-				.. commands_table.desc or ""
+				.. (commands_table.args_desc or "") .. " - "
+				.. (commands_table.desc or "")
 				.. "\n"
 			::continue::
 		end
