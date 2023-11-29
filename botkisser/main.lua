@@ -55,8 +55,10 @@ end
 
 local function clean_nils(t)
 	local ans = {}
-	for _, v in pairs(t) do
-		ans[#ans + 1] = v
+	for i = 1, #t do
+		if t[i] == nil then
+			table.remove(t, i)
+		end
 	end
 	return ans
 end
