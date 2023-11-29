@@ -166,10 +166,16 @@ local function check_for_expired_roles(server_id)
 	for i, v in ipairs(custom_roles) do
 		---@diagnostic disable-next-line: param-type-mismatch
 		if v["exp_time"] < os.time(os.date('!*t')) then
+			if v == nil or v["role_id"] == nil then
+				goto continue
+			end
 			local role = client:getRole(v["role_id"])
 			custom_roles[i] = nil
-			role:delete()
+			if role ~= nil then
+				role:delete()
+			end
 		end
+	    ::continue::
 	end
 
 	update_setting(server_id, "custom_roles", clean_nils(custom_roles))
@@ -411,9 +417,9 @@ table.insert(commands_table, {
 		end
 
 		local roles_count = count_amount_of_custom_roles(server_id, message.author.id)
-		if roles_count > limit then
+		if roles_count >= limit then
 			send_message_or_react(message, server_id,
-				'oonono, too many roles for you, my friend!.. limit is ' .. roles_count .. ' btw', emoji_strs.no)
+				'oonono, too many roles for you, my friend!.. limit is ' .. limit .. ' btw', emoji_strs.no)
 			message.channel:send('https://tenor.com/view/powerful-head-slap-anime-death-tragic-gif-14358509')
 			return
 		end
