@@ -53,6 +53,14 @@ local function load_data(path, filename_no_extension)
 	return data
 end
 
+local function clean_nils(t)
+	local ans = {}
+	for _, v in pairs(t) do
+		ans[#ans + 1] = v
+	end
+	return ans
+end
+
 local function set_system_command(command)
 	local file = io.open("bot_command.txt", "wb")
 	if file == nil then return end
@@ -138,7 +146,7 @@ local function create_and_assign_role(server_id, user, name, color, exp_time)
 	role:setColor(color)
 	member:addRole(role.id)
 
-	local custom_roles = get_setting(server_id, "custom_roles") or {}
+	local custom_roles = clean_nils(get_setting(server_id, "custom_roles")) or {}
 	local role_entry = {}
 	role_entry["user_id"] = user.id
 	role_entry["role_id"] = role.id
@@ -169,7 +177,7 @@ local function check_for_expired_roles(server_id)
 end
 
 local function count_amount_of_custom_roles(server_id, user_id)
-	local custom_roles = get_setting(server_id, "custom_roles") or {}
+	local custom_roles = clean_nils(get_setting(server_id, "custom_roles")) or {}
 	local count = 0
 
 	for i, v in ipairs(custom_roles) do
@@ -180,7 +188,7 @@ local function count_amount_of_custom_roles(server_id, user_id)
 			local role = client:getRole(v["role_id"])
 			count = count + 1
 		end
-	    ::continue::
+		::continue::
 	end
 
 	return count
@@ -400,7 +408,7 @@ table.insert(commands_table, {
 				'role limit is not set yet..', emoji_strs.question)
 			return
 		end
-		
+
 		local roles_count = count_amount_of_custom_roles(server_id, message.author.id)
 		if roles_count > limit then
 			send_message_or_react(message, server_id,
