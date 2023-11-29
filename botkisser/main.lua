@@ -1,5 +1,6 @@
 local discordia = require('discordia')
 local process = require('process').globalProcess()
+local timer = require('timer')
 
 local client = discordia.Client {
 	cacheAllMembers = true,
@@ -68,11 +69,30 @@ local function exit_stop()
 	process:exit(0)
 end
 
+local emoji_strs = {
+	no = { "🇳", "🇴" },
+	ok = { "🆗" },
+	question = { "❓" }
+}
+
+local function react(message, emoji_str)
+	for _, emoji in ipairs(emoji_str) do
+		message:addReaction(emoji)
+	end
+	timer.setTimeout(3000, coroutine.wrap(message.clearReactions), message)
+end
+
+local function send_message_or_react(message, server_id, str, emoji_str)
+	if server_settings[server_id].react or false then
+		react(message, emoji_strs.ok)
+	else
+		message.channel:send(str)
+	end
+end
+
 local function is_admin(message)
 	if message.member.hasPermission then
 		if not message.member:hasPermission("administrator") then
-			-- The user does not have enough permissions
-			message:reply("You do not have `administrator` permissions, sorry!")
 			return false
 		end
 	else
@@ -80,6 +100,20 @@ local function is_admin(message)
 		return false
 	end
 	return true
+end
+
+local function has_admin_perms(message)
+	if message.member.hasPermission or false then
+		return false
+	end
+
+	if message.member:hasPermission("administrator") then
+		return true
+	end
+	-- The user does not have enough permissions
+	send_message_or_react(message, message.guild.id,
+		"You do not have `administrator` permissions, sorry!", emoji_strs.no)
+	return false
 end
 
 local function update_setting(server_id, field_name, data)
@@ -97,90 +131,196 @@ local function update_setting(server_id, field_name, data)
 	save_data("kisser_data", "server_settings", server_settings)
 end
 
-local function handle_tem(message, words)
-	if words[1] == 'help' then
-		message.channel:send('ar u mad? look there is my comadns:\n'
-			.. 'help - this message\n'
-			.. 'update - update from github\n'
-			.. 'stop - stop bot forever\n')
-	end
 
-	if words[1] == 'update' then
+-- template
+-- admin only
+-- { is_admin = 1 , name = "name", function = fname }
+-- function template:
+--[[
+local function test(message,words,server_id)
+
+end
+]]
+
+local commands_table = {
+	test_cmd = {
+		admin_only = true,
+		tem_only = true,
+		name = "echo",
+		args_desc = "( ... )",
+		desc = "echoes anything you sent",
+		fn = function(message, words, server_id)
+			local str = message.content
+			local str, i = str:gsub("1", "", 1)
+			str = (i > 0) and str or str:gsub("^.-%s", "", 1)
+			message.channel:send("There is what you just said:" .. str)
+			return true
+		end
+	}
+}
+
+table.insert(commands_table, {
+	name = "help",
+	desc = "print this message",
+	fn = function(message, words, server_id)
+		local help_message = "Here is some of my commands for you, that you can use\n"
+
+		for _, entry in ipairs(commands_table) do
+			-- help prints only commands visible to user
+			if (entry.admin_only and ! is_admin(message)) or
+				(entry.tem_only and message.author.id ~= tem_id) then
+				goto continue
+			end
+
+			help_message = help_message
+				.. '\t'
+				.. commands_table.name .. " "
+				.. commands_table.args_desc or "" .. " - "
+				.. commands_table.desc or ""
+				.. "\n"
+			::continue::
+		end
+
+		message.channel:send(help_message)
+	end
+})
+
+commands_table:insert({
+	tem_only = true,
+	name = "update",
+	desc = "updates the bot from hitgub repos and then restarts.. for tem usage only!",
+	fn = function(message, words, server_id)
 		exit_update()
 	end
+})
 
-	if words[1] == 'stop' then
+commands_table:insert({
+	tem_only = true,
+	name = "stop",
+	desc = "stops the bot.. no restart though..",
+	fn = function(message, words, server_id)
 		exit_stop()
 	end
-end
+})
 
-local function handle_command(message, words)
-	local server_id = message.guild.id
-
-	if server_id == nil then
-		print('no server_id')
-		return
-	end
-
-	if words[1] == prefix .. 'help' then
-		message.channel:send('There is my comamnd if yu want to know!! \n'
-			.. prefix .. 'set_channel - set channel where i will kiss peopl\n'
-			.. prefix .. 'set_role (role ping / role id) - set role who will be kissed\n'
-			.. prefix .. 'set_period (number) - set period in minutes\n'
-			.. prefix .. 'get_settings - dump setings to chat in json format\n'
-			.. prefix .. 'set_settings {json string} - apply settings from json string\n'
-			.. prefix .. 'help - show this mesage')
-		return
-	end
-
-	if words[1] == prefix .. 'set_channel' and is_admin(message) then
+commands_table:insert({
+	admin_only = true,
+	name = "set_channel",
+	desc = "set the channel where i will kiss peopl",
+	fn = function(message, words, server_id)
 		update_setting(server_id, "kiss_channel_id", message.channel.id)
 		message.channel:send('Channel set as the kissing destination')
-		return
 	end
+})
 
-	if words[1] == prefix .. 'set_role' and is_admin(message) then
+commands_table:insert({
+	admin_only = true,
+	name = "set_period",
+	args_desc = '(number)',
+	desc = "set period in minutes",
+	fn = function(message, words, server_id)
+		if #words ~= 2 then
+			send_message_or_react(message, server_id, "specify period in minutes, please...", emoji_strs
+				.question)
+			return
+		end
+
+		local num = tonumber(words[2]);
+
+		if num ~= nil then
+			update_setting(server_id, "kiss_every", num)
+			send_message_or_react(message, server_id, 'Now i will kiss every ' .. num .. ' min', emoji_strs.ok)
+		else
+			send_message_or_react(message, server_id, 'Looks like not valid number....', emoji_strs.question)
+		end
+	end
+})
+
+commands_table:insert({
+	admin_only = true,
+	name = 'set_role',
+	args_desc = '(pinged role / role id)',
+	desc = 'set the role who will be kissed',
+	fn = function(message, words, server_id)
 		local mentioned_role_id
 		if message.mentionedRoles.first ~= nil or words[2] ~= nil then
 			mentioned_role_id = message.mentionedRoles.first.id
 		else
-			message.channel:send('Also specify role, please (ping them or give me role id)')
+			message.channel:send('also specify role, please (ping them or give me role id)')
 		end
 
 		update_setting(server_id, "role_kiss_id", mentioned_role_id)
-		message.channel:send('Set ' ..
-			message.mentionedRoles.first.name .. '( id:' .. mentioned_role_id .. ') as role to kiss')
-		return
-	end
 
-	if words[1] == prefix .. 'set_period' and is_admin(message) then
-		local num = tonumber(words[2]);
-		if num ~= nil then
-			update_setting(server_id, "kiss_every", num)
-			message.channel:send('Now i will kiss every ' .. num .. ' min')
-		else
-			message.channel:send('Looks like not valid number....')
-		end
-		return
+		send_message_or_react(message, server_id, 'Set ' .. message.mentionedRoles.first.name
+			.. '( id:' .. mentioned_role_id .. ') as role to kiss', emoji_strs.ok)
 	end
+})
 
-	if words[1] == prefix .. 'get_settings' and is_admin(message) then
+commands_table:insert({
+	admin_only = true,
+	name = 'get_settings',
+	desc = 'dump setings to chat in json format',
+	fn = function(message, words, server_id)
 		message.channel:send(json.encode(server_settings[server_id]))
-		return
 	end
+})
 
-	if words[1] == prefix .. 'set_settings' and is_admin(message) then
-		local content = message.content:gsub("^.-%s", "",1) 
+commands_table:insert({
+	admin_only = true,
+	name = 'set_settings',
+	args_desc = '(json string)',
+	desc = 'apply settings from json string',
+	fn = function(message, words, server_id)
+		local content = message.content:gsub("^.-%s", "", 1)
 		server_settings[server_id] = json.decode(content)
 
 		save_data("kisser_data", "server_settings", server_settings)
-		message.channel:send('Done!.. i think..')
+		send_message_or_react(message, server_id, 'Done!.. i think..', emoji_strs.ok)
 	end
+})
+
+commands_table:insert({
+	admin_only = true,
+	name = 'toggle',
+	args_desc = '[feature name]',
+	desc = 'togles off or on some bot features\n'
+		.. '\t\t\'custom_role\' - \"role dispenser\" feature\n'
+		.. '\t\t\'react\' - when on, reacts on commands with temporary emojis (when possible)\n',
+	fn = function(message, words, server_id)
+		server_settings[server_id] =
+
+			save_data("kisser_data", "server_settings", server_settings)
+		send_message_or_react(message, server_id, 'Done!.. i think..', emoji_strs.ok)
+	end
+})
+
+local function command_handle(message, words, server_id)
+	local command = nil
+	for _, entry in ipairs(commands_table) do
+		if ((entry.tem_only or false) and message.author.id ~= tem_id) or
+			((entry.admin_only or false) and ! has_admin_perms(message)) then
+			goto continue
+		end
+		if words[1] == prefix .. entry.name then
+			command = entry
+			break
+		end
+		::continue::
+	end
+
+	if command == nil then
+		react(message, emoji_strs.question)
+		return
+	end
+
+	command.fn(message, words, server_id)
 end
 
 client:on('messageCreate', function(message)
 	-- do not react at my own messages
 	if message.author.id == bot_itself_id then return end
+	-- ignore bot messages
+	if message.author.bot then return end
 
 	print('[KISSINFO] author: ' .. message.author.username ..
 		' content: ' .. message.content ..
@@ -189,12 +329,18 @@ client:on('messageCreate', function(message)
 	local words = {}
 	for word in message.content:gmatch("%S+") do table.insert(words, word) end
 
-	if message.author.id == tem_id and message.channel.type == discordia.enums.channelType.private then
-		handle_tem(message, words)
+	local server_id = message.guild.id or false
+
+	if ! server_id then
+		print('no server_id')
 		return
 	end
 
-	handle_command(message, words)
+	if server_settings[server_id] == nil then
+		print('[WARNING] no settings for server ' .. server_id)
+	end
+
+	command_handle(message, words, server_id)
 end)
 
 clock:on("min", function()
@@ -211,7 +357,7 @@ clock:on("min", function()
 
 		personal_counter = server_settings[server_id].counter or 0
 		kiss_every = server_settings[server_id].kiss_every or 0
-		
+
 		server_settings[server_id].counter = personal_counter + 1
 
 		if personal_counter % kiss_every ~= 0 then
