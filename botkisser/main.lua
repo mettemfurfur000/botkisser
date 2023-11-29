@@ -167,7 +167,7 @@ table.insert(commands_table, {
 
 		for _, entry in ipairs(commands_table) do
 			-- help prints only commands visible to user
-			if (entry.admin_only and ! is_admin(message)) or
+			if (entry.admin_only and not is_admin(message)) or
 				(entry.tem_only and message.author.id ~= tem_id) then
 				goto continue
 			end
@@ -298,7 +298,7 @@ local function command_handle(message, words, server_id)
 	local command = nil
 	for _, entry in ipairs(commands_table) do
 		if ((entry.tem_only or false) and message.author.id ~= tem_id) or
-			((entry.admin_only or false) and ! has_admin_perms(message)) then
+			((entry.admin_only or false) and not has_admin_perms(message)) then
 			goto continue
 		end
 		if words[1] == prefix .. entry.name then
@@ -331,7 +331,7 @@ client:on('messageCreate', function(message)
 
 	local server_id = message.guild.id or false
 
-	if ! server_id then
+	if not server_id then
 		print('no server_id')
 		return
 	end
