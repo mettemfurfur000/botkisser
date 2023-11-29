@@ -12,7 +12,6 @@ while true; do
 		exit 0
 	elif [[ $command == "error" ]]; then
 		echo "bruh"
-		exit 0
 	fi
 	sleep 1
 done
