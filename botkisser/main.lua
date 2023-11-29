@@ -85,7 +85,7 @@ end
 
 local function send_message_or_react(message, server_id, str, emoji_str)
 	if server_settings[server_id].react or false then
-		react(message, emoji_strs.ok)
+		react(message, emoji_str)
 	else
 		message.channel:send(str)
 	end
@@ -104,7 +104,8 @@ local function is_admin(message)
 end
 
 local function has_admin_perms(message)
-	if message.member.hasPermission or false then
+	if message.member.hasPermission == nil then
+		print('no permissions method')
 		return false
 	end
 
@@ -118,16 +119,51 @@ local function has_admin_perms(message)
 end
 
 local function update_setting(server_id, field_name, data)
-	local settings
-	if server_settings[server_id] ~= nil then
-		settings = server_settings[server_id]
-	else
-		settings = {}
+	local settings = (server_settings[server_id] or {})
+	settings[field_name] = data
+	server_settings[server_id] = settings
+	save_data("kisser_data", "server_settings", server_settings)
+end
+
+local function get_setting(server_id, field_name)
+	return server_settings[server_id][field_name]
+end
+--
+local function create_and_assign_role(server_id, user, name, color, exp_time)
+	local guild = client:getGuild(server_id)
+	local member = guild:getMember(user.id)
+
+	local role = guild:createRole(name)
+
+	role:setColor(color)
+	member:addRole(role.id)
+
+	local custom_roles = get_setting(server_id, "custom_roles") or {}
+	local role_entry = {}
+	role_entry["user_id"] = user.id
+	role_entry["role_id"] = role.id
+	---@diagnostic disable-next-line: param-type-mismatch
+	role_entry["exp_time"] = os.time(os.date('!*t')) + (exp_time * 60)
+
+	table.insert(custom_roles, role_entry)
+
+	update_setting(server_id, "custom_roles", custom_roles)
+end
+
+local function check_for_expired_roles(server_id)
+	local guild = client:getGuild(server_id)
+	local custom_roles = get_setting(server_id, "custom_roles") or {}
+
+	for i, v in ipairs(custom_roles) do
+		---@diagnostic disable-next-line: param-type-mismatch
+		if v["exp_time"] < os.time(os.date('!*t')) then
+			local role = client:getRole(v["role_id"])
+			custom_roles[i] = nil
+			role:delete()
+		end
 	end
 
-	settings[field_name] = data
-
-	server_settings[server_id] = settings
+	update_setting(server_id, "custom_roles", custom_roles)
 
 	save_data("kisser_data", "server_settings", server_settings)
 end
@@ -140,7 +176,7 @@ end
 local function test(message,words,server_id)
 
 end
-]]
+
 
 local commands_table = {
 	test_cmd = {
@@ -158,10 +194,13 @@ local commands_table = {
 		end
 	}
 }
+]]
+
+local commands_table = {}
 
 table.insert(commands_table, {
 	name = "help",
-	desc = "print this message",
+	desc = "print commands that you can use",
 	fn = function(message, words, server_id)
 		local help_message = "Here is some of my commands for you, that you can use\n"
 
@@ -173,10 +212,11 @@ table.insert(commands_table, {
 			end
 
 			help_message = help_message
-				.. '\t'
-				.. commands_table.name .. " "
-				.. (commands_table.args_desc or "") .. " - "
-				.. (commands_table.desc or "")
+				.. '\t`'
+				.. prefix
+				.. (entry.name or "[no command name, must be bug]") .. "` "
+				.. (entry.args_desc or "") .. " - "
+				.. (entry.desc or "")
 				.. "\n"
 			::continue::
 		end
@@ -190,6 +230,7 @@ table.insert(commands_table, {
 	name = "update",
 	desc = "updates the bot from hitgub repos and then restarts.. for tem usage only!",
 	fn = function(message, words, server_id)
+		react(message, emoji_strs.ok)
 		exit_update()
 	end
 })
@@ -199,6 +240,7 @@ table.insert(commands_table, {
 	name = "stop",
 	desc = "stops the bot.. no restart though..",
 	fn = function(message, words, server_id)
+		react(message, emoji_strs.ok)
 		exit_stop()
 	end
 })
@@ -209,7 +251,7 @@ table.insert(commands_table, {
 	desc = "set the channel where i will kiss peopl",
 	fn = function(message, words, server_id)
 		update_setting(server_id, "kiss_channel_id", message.channel.id)
-		message.channel:send('Channel set as the kissing destination')
+		send_message_or_react(message, server_id, 'Channel set as the kissing destination', emoji_strs.ok)
 	end
 })
 
@@ -246,13 +288,37 @@ table.insert(commands_table, {
 		if message.mentionedRoles.first ~= nil or words[2] ~= nil then
 			mentioned_role_id = message.mentionedRoles.first.id
 		else
-			message.channel:send('also specify role, please (ping them or give me role id)')
+			send_message_or_react(message, server_id, 'also specify role, please (ping them or give me role id)',
+				emoji_strs.question)
 		end
 
 		update_setting(server_id, "role_kiss_id", mentioned_role_id)
 
 		send_message_or_react(message, server_id, 'Set ' .. message.mentionedRoles.first.name
 			.. '( id:' .. mentioned_role_id .. ') as role to kiss', emoji_strs.ok)
+	end
+})
+
+table.insert(commands_table, {
+	admin_only = true,
+	name = 'set_role_exp_time',
+	args_desc = '(time in minutes)',
+	desc = 'how long it takes for custom roles to dissolve in air',
+	fn = function(message, words, server_id)
+		if #words ~= 2 then
+			send_message_or_react(message, server_id, "specify period in minutes, please...", emoji_strs
+				.question)
+			return
+		end
+
+		local num = tonumber(words[2]);
+
+		if num ~= nil then
+			update_setting(server_id, "role_exp_time", num)
+			send_message_or_react(message, server_id, 'now roles will dissolve in ' .. num .. ' min', emoji_strs.ok)
+		else
+			send_message_or_react(message, server_id, 'Looks like not valid number....', emoji_strs.question)
+		end
 	end
 })
 
@@ -284,24 +350,68 @@ table.insert(commands_table, {
 	name = 'toggle',
 	args_desc = '[feature name]',
 	desc = 'togles off or on some bot features\n'
-		.. '\t\t\'custom_role\' - \"role dispenser\" feature\n'
-		.. '\t\t\'react\' - when on, reacts on commands with temporary emojis (when possible)\n',
+		.. '\t\t`custom_role` - \"role dispenser\" feature\n'
+		.. '\t\t`react` - when on, reacts on commands with temporary emojis (when possible)',
 	fn = function(message, words, server_id)
-		server_settings[server_id] =
+		if words[2] == nil then
+			send_message_or_react(message, server_id, 'choose feature name to toggle..', emoji_strs.question)
+		end
 
-			save_data("kisser_data", "server_settings", server_settings)
-		send_message_or_react(message, server_id, 'Done!.. i think..', emoji_strs.ok)
+		local toggle_state = (not get_setting(server_id, "toggle_" .. words[2]) or false)
+		update_setting(server_id, "toggle_" .. words[2], toggle_state)
+
+		send_message_or_react(message, server_id,
+			'Done!.. i think.. ' .. 'now its ' .. (toggle_state and "true" or "false"), emoji_strs.ok)
+	end
+})
+
+table.insert(commands_table, {
+	name = "give_me_role",
+	args_desc = "(role name) (color hex code, example: #5588af)",
+	desc = "sets custom role for you! will expire after some time..",
+	fn = function(message, words, server_id)
+		if not (get_setting(server_id, "toggle_custom_role") or false) then
+			send_message_or_react(message, server_id,
+				'feature is disbled rn.. sowwy', emoji_strs.no)
+			return
+		end
+
+		if #words ~= 3 then
+			send_message_or_react(message, server_id,
+				'wrong argument number: only role name and color hex code required..', emoji_strs.question)
+			return
+		end
+
+		local exp_time = get_setting(server_id, "role_exp_time")
+		if not exp_time then
+			send_message_or_react(message, server_id, 'sorry, expiration time is not set on this server yet...',
+				emoji_strs.question)
+			return
+		end
+
+		create_and_assign_role(server_id,
+			message.author,
+			words[2],
+			discordia.Color.fromHex(words[3]),
+			exp_time)
+		send_message_or_react(message, server_id, 'Enjoy your new shiny role! it will expire after ' ..
+			exp_time .. ' min', emoji_strs.ok)
 	end
 })
 
 local function command_handle(message, words, server_id)
 	local command = nil
 	for _, entry in ipairs(commands_table) do
-		if ((entry.tem_only or false) and message.author.id ~= tem_id) or
-			((entry.admin_only or false) and not has_admin_perms(message)) then
-			goto continue
-		end
 		if words[1] == prefix .. entry.name then
+			if ((entry.tem_only or false) and message.author.id ~= tem_id) then
+				send_message_or_react(message, server_id, 'its for tem only!..', emoji_strs.no)
+				return
+			end
+			if ((entry.admin_only or false) and not has_admin_perms(message)) then
+				print(entry.admin_only, has_admin_perms(message))
+				send_message_or_react(message, server_id, 'its for admins only!..', emoji_strs.no)
+				return
+			end
 			command = entry
 			break
 		end
@@ -326,6 +436,11 @@ client:on('messageCreate', function(message)
 		' content: ' .. message.content ..
 		' channel type: ' .. message.channel.type)
 
+	-- check if its even a command or not
+	if string.sub(message.content, 1, 1) ~= prefix then
+		return
+	end
+
 	local words = {}
 	for word in message.content:gmatch("%S+") do table.insert(words, word) end
 
@@ -346,6 +461,12 @@ end)
 clock:on("min", function()
 	for guild in client.guilds:iter() do
 		local server_id = guild.id
+
+		if server_id == 1143597013779361915 then
+			goto continue
+		end
+
+		check_for_expired_roles(server_id)
 
 		local personal_counter
 		local kiss_every
