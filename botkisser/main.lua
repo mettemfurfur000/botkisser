@@ -160,7 +160,7 @@ end
 
 local function check_for_expired_roles(server_id)
 	local guild = client:getGuild(server_id)
-	local custom_roles = get_setting(server_id, "custom_roles") or {}
+	local custom_roles = clean_nils(get_setting(server_id, "custom_roles")) or {}
 
 	for i, v in ipairs(custom_roles) do
 		---@diagnostic disable-next-line: param-type-mismatch
