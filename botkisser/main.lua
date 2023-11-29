@@ -175,7 +175,7 @@ local function check_for_expired_roles(server_id)
 				role:delete()
 			end
 		end
-	    ::continue::
+		::continue::
 	end
 
 	update_setting(server_id, "custom_roles", clean_nils(custom_roles))
@@ -443,7 +443,7 @@ table.insert(commands_table, {
 			discordia.Color.fromHex(words[3]),
 			exp_time)
 		send_message_or_react(message, server_id, 'Enjoy your new shiny role! it will expire after ' ..
-			exp_time .. ' min and you have ' .. limit - roles_count .. ' more role slots', emoji_strs.ok)
+			exp_time .. ' min and you have ' .. limit - roles_count - 1 .. ' more role slots', emoji_strs.ok)
 	end
 })
 
