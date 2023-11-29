@@ -171,7 +171,7 @@ local function check_for_expired_roles(server_id)
 		end
 	end
 
-	update_setting(server_id, "custom_roles", custom_roles)
+	update_setting(server_id, "custom_roles", clean_nils(custom_roles))
 
 	save_data("kisser_data", "server_settings", server_settings)
 end
