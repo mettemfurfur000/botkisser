@@ -173,11 +173,14 @@ local function count_amount_of_custom_roles(server_id, user_id)
 	local count = 0
 
 	for i, v in ipairs(custom_roles) do
-		---@diagnostic disable-next-line: param-type-mismatch
+		if v == nil then
+			goto continue
+		end
 		if v["user_id"] == user_id then
 			local role = client:getRole(v["role_id"])
 			count = count + 1
 		end
+	    ::continue::
 	end
 
 	return count
