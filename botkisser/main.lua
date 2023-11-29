@@ -54,13 +54,12 @@ local function load_data(path, filename_no_extension)
 end
 
 local function clean_nils(t)
-	local ans = {}
 	for i = 1, #t do
 		if t[i] == nil then
 			table.remove(t, i)
 		end
 	end
-	return ans
+	return t
 end
 
 local function set_system_command(command)
