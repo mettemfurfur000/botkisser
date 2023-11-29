@@ -168,6 +168,21 @@ local function check_for_expired_roles(server_id)
 	save_data("kisser_data", "server_settings", server_settings)
 end
 
+local function count_amount_of_custom_roles(server_id, user_id)
+	local custom_roles = get_setting(server_id, "custom_roles") or {}
+	local count = 0
+
+	for i, v in ipairs(custom_roles) do
+		---@diagnostic disable-next-line: param-type-mismatch
+		if v["user_id"] == user_id then
+			local role = client:getRole(v["role_id"])
+			count = count + 1
+		end
+	end
+
+	return count
+end
+
 -- template
 -- admin only
 -- { is_admin = 1 , name = "name", function = fname }
@@ -376,6 +391,20 @@ table.insert(commands_table, {
 			return
 		end
 
+		local limit = get_setting(server_id, "role_limit") or 0
+		if limit == 0 then
+			send_message_or_react(message, server_id,
+				'role limit is not set yet..', emoji_strs.question)
+			return
+		end
+		
+		if count_amount_of_custom_roles(server_id, message.author.id) > limit then
+			send_message_or_react(message, server_id,
+				'oonono, too many roles for you, my friend!..', emoji_strs.no)
+			message.channel:send('/gif anime bonk')
+			return
+		end
+
 		if #words ~= 3 then
 			send_message_or_react(message, server_id,
 				'wrong argument number: only role name and color hex code required..', emoji_strs.question)
@@ -396,6 +425,29 @@ table.insert(commands_table, {
 			exp_time)
 		send_message_or_react(message, server_id, 'Enjoy your new shiny role! it will expire after ' ..
 			exp_time .. ' min', emoji_strs.ok)
+	end
+})
+
+table.insert(commands_table, {
+	admin_only = true,
+	name = 'set_role_limit',
+	args_desc = '(number)',
+	desc = 'how many custom roles i can create for a person',
+	fn = function(message, words, server_id)
+		if #words ~= 2 then
+			send_message_or_react(message, server_id, "specify a number, pleasb...", emoji_strs.question)
+			return
+		end
+
+		local num = tonumber(words[2]);
+
+		if num ~= nil then
+			update_setting(server_id, "role_limit", num)
+			send_message_or_react(message, server_id, 'now single person can create maximum ' .. num .. ' custom roles',
+				emoji_strs.ok)
+		else
+			send_message_or_react(message, server_id, 'its not a number....', emoji_strs.question)
+		end
 	end
 })
 
