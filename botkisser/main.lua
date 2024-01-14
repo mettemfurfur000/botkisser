@@ -567,6 +567,7 @@ clock:on("min", function()
 		if required_role_id == nil then
 			print("role is not set for guild " .. server_id .. ", falling at default role")
 			required_role_id = guild.defaultRole.id
+			anyrole = "any"
 		end
 
 		-- choose member
