@@ -54,6 +54,7 @@ local function load_data(path, filename_no_extension)
 end
 
 local function clean_nils(t)
+	if t == nil then return nil end
 	for i = 1, #t do
 		if t[i] == nil then
 			table.remove(t, i)
