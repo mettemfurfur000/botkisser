@@ -563,6 +563,7 @@ clock:on("min", function()
 
 		-- set required role, or default role if not set for this server
 		local required_role_id = server_settings[server_id].role_kiss_id
+		local anyrole = nil
 		if required_role_id == nil then
 			print("role is not set for guild " .. server_id .. ", falling at default role")
 			required_role_id = guild.defaultRole.id
@@ -574,7 +575,7 @@ clock:on("min", function()
 			or random_person.user.bot == true  --dont kiss bots
 			or random_person.roles:find(function(o) -- dont kiss people who doesnt have kiss role
 				return o.id == required_role_id
-			end) == nil
+			end) == anyrole
 		do
 			random_person = guild.members:random()
 		end
